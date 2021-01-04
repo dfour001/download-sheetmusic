@@ -1,5 +1,7 @@
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
+from requests import get
+import os
 
 # The sheet music for each song is located on its own page
 # First I need to get the link to the page for each song
@@ -15,16 +17,37 @@ def get_song_page_list(soup):
     
     table = soup.find('table') # I only need the first table tag
     links = table.find_all('a')
-    linkList = [baseURL + link['href'] for link in links if link['href'] != '#']
+    urlList = [baseURL + link['href'] for link in links if link['href'] != '#']
 
-    return linkList
+    return urlList
     
 
+def get_pdf_url(soup):
+    downloadButton = soup.find('a', text='Download Pdf File')
+    fileName = downloadButton['href'].split('/')[-1]
+    pdfURL = f'{baseURL}_scores/{fileName}'
+    return pdfURL
 
 
-def download_pdfs(urls):
+def download_pdf(url):
     """ Downloads the pdfs from the input song page urls """
-    pass
+    fileName = url.split('/')[-1]
+    if not os.path.exists('sheetmusic'):
+        os.makedirs('sheetmusic')
+
+    if fileName not in os.listdir('sheetmusic'):
+        print(f'Downloading {fileName}...')
+        try:
+            pdf = get(url)
+
+            with open(f'sheetmusic/{fileName}', 'wb') as file:
+                file.write(pdf.content)
+        except:
+            print(f'Error downloading {fileName}')
+    else:
+        print(f'{fileName} already exists.')
+        
+
 
 
 def get_soup(url):
@@ -37,7 +60,11 @@ def get_soup(url):
 
 
 if __name__ == "__main__":
-    soup = get_soup(songListURL)
-
-tables = soup.find_all("table")
-print(type(tables[0]))
+    soup = get_soup(songListURL) # Get song contents page as BeautifulSoup object
+    urlList = get_song_page_list(soup) # Get urls for each song in contents
+    
+    # For url in urlList, get list of PDFs to download
+    for url in urlList:
+        songSoup = get_soup(url) # Get BeautifulSoup object of song page
+        pdfURL = get_pdf_url(songSoup)
+        download_pdf(pdfURL)
